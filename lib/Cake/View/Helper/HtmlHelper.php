@@ -110,11 +110,18 @@ class HtmlHelper extends AppHelper {
 	protected $_crumbs = array();
 
 /**
- * Names of script files that have been included once
+ * Names of script files, or content of script blocks that have been included once
  *
  * @var array
  */
 	protected $_includedScripts = array();
+
+/**
+ * Names of CSS files, or content of style blocks that have been included once
+ *
+ * @var array
+ */
+	protected $_includedCss = array();
 
 /**
  * Options for the currently opened script block buffer if any.
@@ -396,6 +403,8 @@ class HtmlHelper extends AppHelper {
  *   and included in the `$scripts_for_layout` layout variable. Defaults to true.
  * - `block` Set the name of the block link/style tag will be appended to.  This overrides the `inline`
  *   option.
+ * - `once` Whether or not the script should be checked for uniqueness. If true (default) CSS files will only be
+ *   included once, use false to allow the same file to be included more than once per request.
  * - `plugin` False value will prevent parsing path as a plugin
  *
  * @param string|array $path The name of a CSS style sheet or an array containing names of
@@ -407,7 +416,7 @@ class HtmlHelper extends AppHelper {
  * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/html.html#HtmlHelper::css
  */
 	public function css($path, $rel = null, $options = array()) {
-		$options += array('block' => null, 'inline' => true);
+		$options += array('block' => null, 'inline' => true, 'once' => true);
 		if (!$options['inline'] && empty($options['block'])) {
 			$options['block'] = __FUNCTION__;
 		}
@@ -436,14 +445,19 @@ class HtmlHelper extends AppHelper {
 				}
 			}
 		}
+		
+		if ($options['once'] && isset($this->_includedCss[$url])) {
+			return null;
+		}
+		$this->_includedCss[$url] = true;
 
 		if ($rel == 'import') {
-			$out = sprintf($this->_tags['style'], $this->_parseAttributes($options, array('inline', 'block'), '', ' '), '@import url(' . $url . ');');
+			$out = sprintf($this->_tags['style'], $this->_parseAttributes($options, array('inline', 'block', 'once'), '', ' '), '@import url(' . $url . ');');
 		} else {
 			if ($rel == null) {
 				$rel = 'stylesheet';
 			}
-			$out = sprintf($this->_tags['css'], $rel, $url, $this->_parseAttributes($options, array('inline', 'block'), '', ' '));
+			$out = sprintf($this->_tags['css'], $rel, $url, $this->_parseAttributes($options, array('inline', 'block', 'once'), '', ' '));
 		}
 
 		if (empty($options['block'])) {
@@ -484,7 +498,7 @@ class HtmlHelper extends AppHelper {
  *   the script tag will be appended to the 'script' view block as well as `$scripts_for_layout`.
  * - `block` The name of the block you want the script appended to.  Leave undefined to output inline.
  *   Using this option will override the inline option.
- * - `once` Whether or not the script should be checked for uniqueness. If true scripts will only be
+ * - `once` Whether or not the script should be checked for uniqueness. If true (default) scripts will only be
  *   included once, use false to allow the same script to be included more than once per request.
  * - `plugin` False value will prevent parsing path as a plugin
  *
@@ -547,7 +561,9 @@ class HtmlHelper extends AppHelper {
  *   `$scripts_for_layout` / `script` block, or output inline. (Deprecated, use `block` instead)
  * - `block` Which block you want this script block appended to.
  *   Defaults to `script`.
- *
+ * - `once` Whether or not the script should be checked for uniqueness. If true (default) scripts will only be
+ *   included once, use false to allow the same script to be included more than once per request.
+ * 
  * @param string $script The script to wrap
  * @param array $options The options to use. Options not listed above will be
  *    treated as HTML attributes.
@@ -555,7 +571,11 @@ class HtmlHelper extends AppHelper {
  * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/html.html#HtmlHelper::scriptBlock
  */
 	public function scriptBlock($script, $options = array()) {
-		$options += array('safe' => true, 'inline' => true);
+		$options += array('safe' => true, 'inline' => true, 'once' => true);
+		if ($options['once'] && isset($this->_includedScripts[$script])) {
+			return null;
+		}
+		$this->_includedScripts[$script] = true;
 		if ($options['safe']) {
 			$script  = "\n" . '//<![CDATA[' . "\n" . $script . "\n" . '//]]>' . "\n";
 		}
@@ -564,7 +584,7 @@ class HtmlHelper extends AppHelper {
 		}
 		unset($options['inline'], $options['safe']);
 
-		$attributes = $this->_parseAttributes($options, array('block'), ' ');
+		$attributes = $this->_parseAttributes($options, array('block', 'once'), ' ');
 		$out = sprintf($this->_tags['javascriptblock'], $attributes, $script);
 
 		if (empty($options['block'])) {

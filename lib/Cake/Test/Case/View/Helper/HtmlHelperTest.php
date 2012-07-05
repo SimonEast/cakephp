@@ -521,7 +521,12 @@ class HtmlHelperTest extends CakeTestCase {
 		);
 		$this->assertTags($result, $expected);
 
+		// Subsequent calls for same file are ignored (once == true by default)
 		$result = $this->Html->css('screen.css');
+		$this->assertNull($result);
+
+		// ...Unless once => false
+		$result = $this->Html->css('screen.css', null, array('once' => false));
 		$this->assertTags($result, $expected);
 
 		CakePlugin::load('TestPlugin');
@@ -594,7 +599,12 @@ class HtmlHelperTest extends CakeTestCase {
 		);
 		$this->assertTags($result, $expected);
 
+		// Subsequent calls to same file are ignored
 		$result = $this->Html->css('TestPlugin.test_plugin_asset.css');
+		$this->assertNull($result);
+
+		// ...Unless once => false
+		$result = $this->Html->css('TestPlugin.test_plugin_asset.css', null, array('once' => false));
 		$this->assertTags($result, $expected);
 
 		$result = $this->Html->css('TestPlugin.my.css.library');
@@ -612,8 +622,8 @@ class HtmlHelperTest extends CakeTestCase {
 
 		Configure::write('Asset.filter.css', false);
 
-		$result = explode("\n", trim($this->Html->css(array('TestPlugin.test_plugin_asset', 'TestPlugin.vendor.generic'))));
-		$expected['link']['href'] = 'preg:/.*test_plugin\/css\/test_plugin_asset\.css/';
+		$result = explode("\n", trim($this->Html->css(array('TestPlugin.test_another_plugin_asset', 'TestPlugin.vendor.generic'))));
+		$expected['link']['href'] = 'preg:/.*test_plugin\/css\/test_another_plugin_asset\.css/';
 		$this->assertTags($result[0], $expected);
 		$expected['link']['href'] = 'preg:/.*test_plugin\/css\/vendor\.generic\.css/';
 		$this->assertTags($result[1], $expected);
@@ -647,7 +657,7 @@ class HtmlHelperTest extends CakeTestCase {
 
 		Configure::write('Asset.timestamp', 'force');
 
-		$result = $this->Html->css('cake.generic');
+		$result = $this->Html->css('cake.generic', null, array('once' => false));
 		$expected['link']['href'] = 'preg:/.*css\/cake\.generic\.css\?[0-9]+/';
 		$this->assertTags($result, $expected);
 
@@ -689,7 +699,12 @@ class HtmlHelperTest extends CakeTestCase {
 
 		Configure::write('Asset.timestamp', 'force');
 
+		// Subsequent calls for same CSS should return null
 		$result = $this->Html->css('TestPlugin.test_plugin_asset');
+		$this->assertNull($result);
+
+		// ...Unless once => false
+		$result = $this->Html->css('TestPlugin.test_plugin_asset', null, array('once' => false));
 		$expected['link']['href'] = 'preg:/.*test_plugin\/css\/test_plugin_asset\.css\?[0-9]+/';
 		$this->assertTags($result, $expected);
 
@@ -1002,15 +1017,12 @@ class HtmlHelperTest extends CakeTestCase {
 		);
 		$this->assertTags($result, $expected);
 
-		$result = $this->Html->scriptBlock('window.foo = 2;', array('safe' => false));
-		$expected = array(
-			'script' => array('type' => 'text/javascript'),
-			'window.foo = 2;',
-			'/script',
-		);
-		$this->assertTags($result, $expected);
-
-		$result = $this->Html->scriptBlock('window.foo = 2;', array('safe' => true));
+		// Subsequent calls for same script should return null
+		$result = $this->Html->scriptBlock('window.foo = 2;');
+		$this->assertNull($result);
+		
+		// ...Unless once => false
+		$result = $this->Html->scriptBlock('window.foo = 2;', array('once' => false));
 		$expected = array(
 			'script' => array('type' => 'text/javascript'),
 			$this->cDataStart,
@@ -1019,25 +1031,44 @@ class HtmlHelperTest extends CakeTestCase {
 			'/script',
 		);
 		$this->assertTags($result, $expected);
+		
+		$result = $this->Html->scriptBlock('window.foo = 3;', array('safe' => false));
+		$expected = array(
+			'script' => array('type' => 'text/javascript'),
+			'window.foo = 3;',
+			'/script',
+		);
+		$this->assertTags($result, $expected);
+		
+
+		$result = $this->Html->scriptBlock('window.foo = 4;', array('safe' => true));
+		$expected = array(
+			'script' => array('type' => 'text/javascript'),
+			$this->cDataStart,
+			'window.foo = 4;',
+			$this->cDataEnd,
+			'/script',
+		);
+		$this->assertTags($result, $expected);
 
 		$this->View->expects($this->at(0))
 			->method('append')
-			->with('script', $this->matchesRegularExpression('/window\.foo\s\=\s2;/'));
+			->with('script', $this->matchesRegularExpression('/window\.foo\s\=\s5;/'));
 
 		$this->View->expects($this->at(1))
 			->method('append')
 			->with('scriptTop', $this->stringContains('alert('));
 
-		$result = $this->Html->scriptBlock('window.foo = 2;', array('inline' => false));
+		$result = $this->Html->scriptBlock('window.foo = 5;', array('inline' => false));
 		$this->assertNull($result);
 
 		$result = $this->Html->scriptBlock('alert("hi")', array('block' => 'scriptTop'));
 		$this->assertNull($result);
 
-		$result = $this->Html->scriptBlock('window.foo = 2;', array('safe' => false, 'encoding' => 'utf-8'));
+		$result = $this->Html->scriptBlock('window.foo = 6;', array('safe' => false, 'encoding' => 'utf-8'));
 		$expected = array(
 			'script' => array('type' => 'text/javascript', 'encoding' => 'utf-8'),
-			'window.foo = 2;',
+			'window.foo = 6;',
 			'/script',
 		);
 		$this->assertTags($result, $expected);
@@ -1063,10 +1094,17 @@ class HtmlHelperTest extends CakeTestCase {
 		);
 		$this->assertTags($result, $expected);
 
+		// Identical calls for same script should return null (once == true)
 		$result = $this->Html->scriptStart(array('safe' => false));
 		$this->assertNull($result);
 		echo 'this is some javascript';
-
+		$result = $this->Html->scriptEnd();
+		$this->assertNull($result);
+		
+		// ...Unless once => false
+		$result = $this->Html->scriptStart(array('safe' => false, 'once' => false));
+		$this->assertNull($result);
+		echo 'this is some javascript';
 		$result = $this->Html->scriptEnd();
 		$expected = array(
 			'script' => array('type' => 'text/javascript'),
@@ -1075,15 +1113,22 @@ class HtmlHelperTest extends CakeTestCase {
 		);
 		$this->assertTags($result, $expected);
 
+		// Identical calls for same script should return null (once == true)
 		$this->View->expects($this->once())
 			->method('append');
+			
 		$result = $this->Html->scriptStart(array('safe' => false, 'inline' => false));
 		$this->assertNull($result);
 		echo 'this is some javascript';
-
 		$result = $this->Html->scriptEnd();
 		$this->assertNull($result);
-	}
+		
+		// ...Unless once == false
+		$result = $this->Html->scriptStart(array('safe' => false, 'inline' => false, 'once' => false));
+		$this->assertNull($result);
+		echo 'this is some javascript';
+		$result = $this->Html->scriptEnd();
+		$this->assertNull($result);	}
 
 /**
  * testCharsetTag method

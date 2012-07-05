@@ -301,7 +301,7 @@ class JsHelperTest extends CakeTestCase {
 		$this->View->expects($this->once())
 			->method('append')
 			->with('script', $this->matchesRegularExpression('/one\s\=\s1;\ntwo\s\=\s2;/'));
-		$result = $this->Js->writeBuffer(array('onDomReady' => false, 'inline' => false, 'cache' => false));
+		$result = $this->Js->writeBuffer(array('onDomReady' => false, 'inline' => false, 'cache' => false, 'once' => false));
 	}
 
 /**
